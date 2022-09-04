@@ -3,8 +3,8 @@
 startTime=`date +%Y%m%d-%H:%M`
 startTime_s=`date +%s`
 
-seed_lst=(8 13 42 50 60)
-task_name_lst=(Yelp)  # SST-2 Yelp AGNews TREC MRPC SNLI
+seed_lst=(8)
+task_name_lst=(SNLI)  # SST-2 Yelp AGNews TREC MRPC SNLI
 cuda=0
 
 
