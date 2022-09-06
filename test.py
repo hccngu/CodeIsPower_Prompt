@@ -25,14 +25,14 @@ task_name = args.task_name
 device = 'cuda:{}'.format(args.cuda)
 tokenizer = RobertaTokenizer.from_pretrained('roberta-large')
 
-# pre_str = tokenizer.decode(list(range(1000, 1050))) + ' . '
+pre_pre_str = tokenizer.decode(list(range(1000, 1050))) + ' . '
 # middle_str = ' ? <mask> .'
 
 
 for seed in [8, 13, 42, 50, 60]:
     torch.manual_seed(seed)
     np.random.seed(seed)
-    # best = torch.load(f'./results/{task_name}/{seed}/best.pt').to(device).view(50, -1)
+    best = torch.load(f'./results/{task_name}/{seed}/best.pt').to(device).view(50, -1)
 
     def sentence_fn(test_data):
         """
@@ -44,26 +44,26 @@ for seed in [8, 13, 42, 50, 60]:
         # SST-2: '%s . %s . It was %s .'
         if task_name in ['SST-2', 'Yelp']:
             post_str = ' . It was <mask> .'
-            return test_data + post_str
+            return pre_pre_str + ' . ' + test_data + post_str
         elif task_name == 'AGNews':
-            pre_str = '<mask> News: '
-            return pre_str + test_data
+            pre_str = ' . <mask> News: '
+            return pre_pre_str + pre_str + test_data
         elif task_name == 'TREC':
-            pre_str = '<mask> question: '
-            return pre_str + test_data
+            pre_str = ' . <mask> question: '
+            return pre_pre_str + pre_str + test_data
         elif task_name in ['SNLI', 'MRPC']:
-            middle_str = '? <mask> , '
-            return test_data + middle_str + test_data
+            middle_str = ' ? <mask> , '
+            return pre_pre_str + ' . ' + test_data + middle_str + test_data
         
         # return pre_str + test_data + middle_str + test_data
 
 
     def embedding_and_attention_mask_fn(embedding, attention_mask):
         # res = torch.cat([init_prompt[:-5, :], input_embed, init_prompt[-5:, :]], dim=0)
-        # prepad = torch.zeros(size=(1, 1024), device=device)
-        # pospad = torch.zeros(size=(embedding.size(1) - 51, 1024), device=device)
-        # return embedding + torch.cat([prepad, best, pospad]), attention_mask
-        return embedding, attention_mask
+        prepad = torch.zeros(size=(1, 1024), device=device)
+        pospad = torch.zeros(size=(embedding.size(1) - 51, 1024), device=device)
+        return embedding + torch.cat([prepad, best, pospad]), attention_mask
+        # return embedding, attention_mask
 
     predictions = torch.tensor([], device=device)
     for res, _, _ in test_api(
