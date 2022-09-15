@@ -3,15 +3,15 @@
 startTime=`date +%Y%m%d-%H:%M`
 startTime_s=`date +%s`
 
-seed_lst=(8)
-task_name_lst=(SNLI)  # SST-2 Yelp AGNews TREC MRPC SNLI
+seed_lst=(8 13 42 50 60)
+task_name_lst=(SST-2 Yelp AGNews TREC MRPC SNLI)  # SST-2 Yelp AGNews TREC MRPC SNLI
 cuda=0
 
 
 for task_name in "${task_name_lst[@]}"; do
-    for seed in "${seed_lst[@]}"; do
-        python -u bbt.py --seed $seed --task_name $task_name
-    done
+    # for seed in "${seed_lst[@]}"; do
+    #     python -u bbt.py --seed $seed --task_name $task_name
+    # done
     python -u test.py --task_name $task_name --cuda $cuda
 done
 
