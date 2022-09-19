@@ -5,8 +5,8 @@ startTime_s=`date +%s`
 
 seed_lst=(60) # 8 13 42 50 60
 task_name_lst=(TREC)  # SST-2 Yelp AGNews TREC MRPC SNLI
-device=cuda:3
-cuda=3
+device=cuda:0
+cuda=0
 model_name=roberta-large
 model_path=roberta-large
 n_prompt_tokens=50
