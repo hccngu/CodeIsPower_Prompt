@@ -34,7 +34,7 @@
 | Xavier Normal            | 6000   | CE        | Test acc: 0.8739 |
 | Kaiming Normal           | 6000   | CE        | Test acc: 0.8624 |
 | Truncated Normal (-2, 2) | 6000   | CE        |                  |
-| Original BBTv2           | 6000   |           |                  |
-| Xavier Normal            | 6000   |           |                  |
-| Kaiming Normal           | 6000   |           |                  |
-| Truncated Normal         | 6000   |           |                  |
+| Original BBTv2           | 6000   | Hinge     | Test acc: 0.8716 |
+| Xavier Normal            | 6000   | Hinge     | Test acc: 0.8589 |
+| Kaiming Normal           | 6000   | Hinge     | Test acc: 0.867  |
+| Truncated Normal         | 6000   | Hinge     |                  |
