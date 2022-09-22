@@ -379,11 +379,11 @@ class SNLILoader(Loader):
             if change_or_not==0:
                 return verb_
             if verb_ == 'No':
-                return 'Unless'
+                return 'Except'#'Unless'
             elif verb_ == 'Maybe':
-                return 'Fortunately'
+                return 'Watch'#'Fortunately'
             elif verb_ == 'Yes':
-                return 'Regardless'
+                return 'Alright'#'Regardless'
         self.label2text = {
             0: change_SNLI_verb("Yes",0),
             1: change_SNLI_verb("Maybe",0),
@@ -396,9 +396,11 @@ class SNLILoader(Loader):
             offset = 1000
             prompt = self.tokenizer.decode(list(range(offset, offset + self.n_prompt_tokens)))
             example['input_text'] = '%s . %s ? %s , %s' % (prompt, example['text1'], self.tokenizer.mask_token ,example['text2'])
+            # example['input_text'] = '%s . %s . %s , no , %s' % (prompt, example['text1'], self.tokenizer.mask_token ,example['text2'])
             example['target_text'] = self.label2text[example['labels']]
         else:
             example['input_text'] = '%s ? %s , %s' % (example['text1'], self.tokenizer.mask_token, example['text2'])
+            # example['input_text'] = '%s . %s , no , %s' % (example['text1'], self.tokenizer.mask_token, example['text2'])
             example['target_text'] = self.label2text[example['labels']]
         return example
 

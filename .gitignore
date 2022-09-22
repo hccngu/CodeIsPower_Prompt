@@ -4,3 +4,8 @@
 *.pt
 *.pyc
 *.bin
+*.pickle
+result*
+.history
+hidstates/*
+*.dat

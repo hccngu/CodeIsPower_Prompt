@@ -15,7 +15,11 @@
                 "--seed","8",
                 "--task_name","SNLI",
                 "--alg","CMA",
-                "--sigma","1",
+                "--sigma1","1",
+                "--budget","480",
+                "--budget2","4000",
+                "--pop_mean","1",
+
             ]
         }
     ]

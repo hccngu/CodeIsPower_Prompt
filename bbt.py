@@ -355,7 +355,7 @@ class LMForwardAPI:
 
         if perf > self.best_train_perf:
             self.best_train_perf = perf
-        if self.num_call % 10 == 0:
+        if self.num_call % 20 == 0:
             print(
                 '[# API Calls {}] loss: {}. Current perf: {}. Best perf so far: {}'.format(
                     self.num_call,

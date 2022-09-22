@@ -413,11 +413,11 @@ class SNLIMetric(MetricBase):
             if change_or_not==0:
                 return verb_
             if verb_ == 'No':
-                return 'Unless'
+                return 'Except'#'Unless'
             elif verb_ == 'Maybe':
-                return 'Fortunately'
+                return 'Watch'#'Fortunately'
             elif verb_ == 'Yes':
-                return 'Regardless'
+                return 'Alright'#'Regardless'
         self.label_map = {
             tokenizer.encode(change_SNLI_verb('Yes',0), add_special_tokens=False)[0]: 0,
             tokenizer.encode(change_SNLI_verb('Maybe',0), add_special_tokens=False)[0]: 1,
