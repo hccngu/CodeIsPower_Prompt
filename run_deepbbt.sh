@@ -24,7 +24,7 @@ eval_every=100
 
 for task_name in "${task_name_lst[@]}"; do
     for seed in "${seed_lst[@]}"; do
-        python -u deepbbt.py --seed $seed --task_name $task_name --device $device --budget $budget --model_name $model_name --model_path $model_path
+        python -u deepbbt.py --seed $seed --task_name $task_name --device $device --random_proj $random_proj --budget $budget --model_name $model_name --model_path $model_path
     done
     # python -u test.py --task_name $task_name --cuda $cuda
 done
