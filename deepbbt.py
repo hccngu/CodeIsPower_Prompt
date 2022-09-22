@@ -6,7 +6,6 @@ import pickle
 import random
 
 import torch
-# import fitlog
 import argparse
 import numpy as np
 import cma
@@ -34,14 +33,15 @@ from sklearn.metrics import f1_score
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_name", default='roberta-large',
-                    choices=['roberta-base', 'roberta-large',
-                             'bert-base-uncased', 'bert-large-uncased',
-                             'facebook/bart-base', 'facebook/bart-large',
-                             't5-small', 't5-base', 't5-large', 't5-3b',
-                             'gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl',
-                             'fnlp/cpt-large',
-                             ], type=str)
-parser.add_argument("--task_name", default='sst2', type=str)
+                    # choices=['roberta-base', 'roberta-large',
+                    #          'bert-base-uncased', 'bert-large-uncased',
+                    #          'facebook/bart-base', 'facebook/bart-large',
+                    #          't5-small', 't5-base', 't5-large', 't5-3b',
+                    #          'gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl',
+                    #          ], 
+                    type=str)
+parser.add_argument("--model_path", default='roberta-large', type=str, help='The path of hugging face models for offline mode, default=model_name')
+parser.add_argument("--task_name", default='TREC', type=str)
 parser.add_argument("--n_prompt_tokens", default=50, type=int)
 parser.add_argument("--intrinsic_dim", default=500, type=int)
 parser.add_argument("--k_shot", default=16, type=int)
@@ -58,7 +58,6 @@ parser.add_argument("--alg", default='CMA', type=str)
 parser.add_argument("--random_proj", default='normal', type=str)
 parser.add_argument("--seed", default=42, type=int)
 parser.add_argument("--loss_type", default='ce', type=str)
-parser.add_argument("--cat_or_add", default='add', type=str)
 parser.add_argument(
     "--inference_framework",
     default='pt',
@@ -77,21 +76,16 @@ args = parser.parse_args()
 # below are free hyper-params
 model_name = args.model_name
 if model_name in ['t5-small', 't5-base', 't5-large', 't5-3b']:
-    from dataloader_t5 import SST2Loader, AGNewsLoader, YelpPLoader, DBPediaLoader, RTELoader, MRPCLoader, SNLILoader
-    from metrics_t5 import SST2Metric, AGNewsMetric, YelpPMetric, DBPediaMetric, RTEMetric, MRPCMetric, SNLIMetric
+    from dataloader_t5 import SST2Loader, AGNewsLoader, YelpPLoader, MRPCLoader, SNLILoader
+    from metrics_t5 import SST2Metric, AGNewsMetric, YelpPMetric, MRPCMetric, SNLIMetric
 elif model_name in ['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl']:
-    from dataloader_gpt import SST2Loader, AGNewsLoader, YelpPLoader, DBPediaLoader, RTELoader, MRPCLoader, SNLILoader
-    from metrics_gpt import SST2Metric, AGNewsMetric, YelpPMetric, DBPediaMetric, RTEMetric, MRPCMetric, SNLIMetric
-elif model_name in ['fnlp/cpt-large']:
-    from dataloader_cpt import ChnSentLoader, AmazonLoader, THUCNewsLoader, BQLoader, CMNLILoader, CCPMLoader, \
-        TNewsLoader, \
-        OCNLILoader, LCQMCLoader, C3Loader
-    from metrics_cpt import ChnSentMetric, AmazonMetric, THUCNewsMetric, BQMetric, CMNLIMetric, CCPMMetric, TNewsMetric, \
-        OCNLIMetric, LCQMCMetric, C3Metric
+    from dataloader_gpt import SST2Loader, AGNewsLoader, YelpPLoader, MRPCLoader, SNLILoader
+    from metrics_gpt import SST2Metric, AGNewsMetric, YelpPMetric, MRPCMetric, SNLIMetric
 else:
-    from dataloader import SST2Loader, AGNewsLoader, YelpPLoader, DBPediaLoader, RTELoader, MRPCLoader, SNLILoader
-    from metrics import SST2Metric, AGNewsMetric, YelpPMetric, DBPediaMetric, RTEMetric, MRPCMetric, SNLIMetric
+    from dataloader import SST2Loader, AGNewsLoader, YelpPLoader, MRPCLoader, SNLILoader, TRECLoader
+    from metrics import SST2Metric, AGNewsMetric, YelpPMetric, MRPCMetric, SNLIMetric, TRECMetric
 
+model_path = args.model_path
 task_name = args.task_name
 n_prompt_tokens = args.n_prompt_tokens
 intrinsic_dim = args.intrinsic_dim
@@ -114,76 +108,43 @@ print_every = args.print_every
 eval_every = args.eval_every
 # if task_name in ['mrpc', 'snli', 'qnli', 'rte']:
 #     args.cat_or_add = 'cat'
-cat_or_add = args.cat_or_add
 inference_framework = args.inference_framework
 onnx_model_path = args.onnx_model_path
 save_hiddens = True
 
-# fixed hyper-params
-if cat_or_add == 'add':
-    init_prompt_path = None
-else:
-    init_prompt_path = './nli_base_prompt.pt'
+# # fixed hyper-params
+# if cat_or_add == 'add':
+#     init_prompt_path = None
+# else:
+#     init_prompt_path = './nli_base_prompt.pt'
 
-if task_name in ['sst2', 'yelpp', 'rte', 'mrpc', 'chnsent', 'lcqmc', 'bq']:
+if task_name in ['SST-2', 'Yelp', 'MRPC']:
     num_labels = 2
-elif task_name in ['snli', 'cmnli', 'ocnli']:
+elif task_name in ['SNLI']:
     num_labels = 3
-elif task_name in ['agnews', 'ccpm', 'c3']:
+elif task_name in ['AGNews']:
     num_labels = 4
-elif task_name in ['amazon', 'trec']:
+elif task_name in ['TREC']:
     num_labels = 5
-elif task_name in ['thucnews']:
-    num_labels = 10
-elif task_name in ['dbpedia', 'tnews']:
-    num_labels = 14
 else:
     raise ValueError
 
-# save_path = 'deep_{}_results/{}_results/D_{}_d_{}_data_{}_{}_range_{}_loss_{}_budget_{}_seed_{}_{}_{}_{}'.format(
-#     model_name.replace('/', '-'),
-#     task_name,
-#     n_prompt_tokens * 1024,
-#     intrinsic_dim,
-#     k_shot * num_labels,
-#     alg,
-#     bound,
-#     loss_type,
-#     budget,
-#     seed,
-#     cat_or_add,
-#     random_proj,
-#     inference_framework
-# )
-# print('Results will be saved in {}'.format(save_path))
-#
-# if os.path.exists(save_path):
-#     print('Experiment already run.')
-#     exit()
-#
-# args.save_path = save_path
 args.bbt_version = 'deepbbt'
-
-# log_dir = './v2_logs'
-# fitlog.set_log_dir(log_dir)
-# fitlog.commit(__file__, fit_msg=save_path)
-# fitlog.add_hyper(args)
-# fitlog.add_hyper_in_file(__file__)
 
 random.seed(seed)
 np.random.seed(seed)
 torch.manual_seed(seed)
 
-
 class LMForwardAPI:
-    def __init__(self, model_name='roberta-large', n_prompt_tokens=50, task_name='sst2',
+    def __init__(self, model_name='roberta-large', model_path='roberta-large', n_prompt_tokens=50, task_name='SST-2',
                  loss_type='hinge'):
         self.model_name = model_name
+        self.model_path = model_path
         if model_name in ['roberta-base', 'roberta-large']:
-            self.config = RobertaConfig.from_pretrained(model_name)
-            self.tokenizer = RobertaTokenizer.from_pretrained(model_name)
+            self.config = RobertaConfig.from_pretrained(model_path)
+            self.tokenizer = RobertaTokenizer.from_pretrained(model_path)
             self.model = RobertaForMaskedLM.from_pretrained(
-                model_name,
+                model_path,
                 config=self.config,
                 n_prompt_tokens=n_prompt_tokens,
                 inference_framework=inference_framework,
@@ -191,49 +152,49 @@ class LMForwardAPI:
             )
             self.model.lm_head.bias = torch.nn.parameter.Parameter(torch.zeros(self.config.vocab_size))
         elif model_name in ['bert-base-uncased', 'bert-large-uncased']:
-            self.config = BertConfig.from_pretrained(model_name)
-            self.tokenizer = BertTokenizer.from_pretrained(model_name)
+            self.config = BertConfig.from_pretrained(model_path)
+            self.tokenizer = BertTokenizer.from_pretrained(model_path)
             self.model = BertForMaskedLM.from_pretrained(
-                model_name,
+                model_path,
                 config=self.config,
                 n_prompt_tokens=n_prompt_tokens,
             )
         elif model_name in ['facebook/bart-base', 'facebook/bart-large']:
-            self.config = BartConfig.from_pretrained(model_name)
-            self.tokenizer = BartTokenizer.from_pretrained(model_name)
+            self.config = BartConfig.from_pretrained(model_path)
+            self.tokenizer = BartTokenizer.from_pretrained(model_path)
             self.model = BartForConditionalGeneration.from_pretrained(
-                model_name,
+                model_path,
                 config=self.config,
                 n_prompt_tokens=n_prompt_tokens,
             )
         elif model_name in ['t5-small', 't5-base', 't5-large', 't5-3b']:
-            self.config = T5Config.from_pretrained(model_name)
-            self.tokenizer = T5Tokenizer.from_pretrained(model_name)
+            self.config = T5Config.from_pretrained(model_path)
+            self.tokenizer = T5Tokenizer.from_pretrained(model_path)
             self.model = T5ForConditionalGeneration.from_pretrained(
-                model_name,
+                model_path,
                 config=self.config,
                 n_prompt_tokens=n_prompt_tokens,
             )
         elif model_name in ['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl']:
-            self.config = GPT2Config.from_pretrained(model_name)
-            self.tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+            self.config = GPT2Config.from_pretrained(model_path)
+            self.tokenizer = GPT2Tokenizer.from_pretrained(model_path)
             self.model = GPT2LMHeadModel.from_pretrained(
-                model_name,
+                model_path,
                 config=self.config,
                 n_prompt_tokens=n_prompt_tokens,
             )
         elif model_name in ['fnlp/cpt-large']:
-            self.config = BartConfig.from_pretrained(model_name)
-            self.tokenizer = BertTokenizer.from_pretrained(model_name)
+            self.config = BartConfig.from_pretrained(model_path)
+            self.tokenizer = BertTokenizer.from_pretrained(model_path)
             self.model = CPTForMaskedLM.from_pretrained(
-                model_name,
+                model_path,
                 config=self.config,
                 n_prompt_tokens=n_prompt_tokens,
             )
         else:
             raise NotImplementedError
 
-        if random_proj == 'normal':
+        if random_proj in ['normal','trunc_normal','kaiming_normal','xavier_normal']:
             self.config.output_hidden_states = True
 
         if inference_framework == 'ort':
@@ -244,180 +205,78 @@ class LMForwardAPI:
         self.init_prompt = None
         self.model.to(device)
         self.model.eval()
-        # 不用nn.Sequential，因为这里并不需要loss.backward，取而代之的是cma算法
         self.linear = torch.nn.ModuleList(
             [torch.nn.Linear(intrinsic_dim, n_prompt_tokens * self.config.hidden_size, bias=False) for _ in
              range(self.config.num_hidden_layers)])
-        # 这里的nn.linear相当于是随机投影矩阵A
+
+        if model_name in ['roberta-base', 'roberta-large']:
+            embedding = self.model.roberta.get_input_embeddings().weight.clone().cpu()
+        elif model_name in ['bert-base-uncased', 'bert-large-uncased']:
+            embedding = self.model.bert.get_input_embeddings().weight.clone().cpu()
+        elif model_name in ['facebook/bart-base', 'facebook/bart-large', 'fnlp/cpt-large']:
+            embedding = self.model.model.get_input_embeddings().weight.clone().cpu()
+        elif model_name in ['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl']:
+            embedding = self.model.transformer.get_input_embeddings().weight.clone().cpu()
+        else:  # T5
+            embedding = self.model.get_input_embeddings().weight.clone().cpu()
+        mu_hat = np.mean(embedding.reshape(-1).detach().cpu().numpy())
+        std_hat = np.std(embedding.reshape(-1).detach().cpu().numpy())
+        mu = 0.0
+        std = std_hat / (np.sqrt(intrinsic_dim) * args.sigma1)
+        print('[Embedding] mu: {} | std: {} [RandProj]  mu: {} | std: {}'.format(mu_hat, std_hat, mu, std))
+        self.intermediate_stats = [(mu, std)]
+            
         if random_proj == 'normal':
+            print('Using Normal Distribution Initialization')
             # calculate std for normal distribution
-            if model_name in ['roberta-base', 'roberta-large']:
-                embedding = self.model.roberta.get_input_embeddings().weight.clone().cpu()
-            elif model_name in ['bert-base-uncased', 'bert-large-uncased']:
-                embedding = self.model.bert.get_input_embeddings().weight.clone().cpu()
-            elif model_name in ['facebook/bart-base', 'facebook/bart-large', 'fnlp/cpt-large']:
-                embedding = self.model.model.get_input_embeddings().weight.clone().cpu()
-            elif model_name in ['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl']:
-                embedding = self.model.transformer.get_input_embeddings().weight.clone().cpu()
-            else:  # T5
-                embedding = self.model.get_input_embeddings().weight.clone().cpu()
-            # embedding = embedding[1000: 2000]
-            mu_hat = np.mean(embedding.reshape(-1).detach().cpu().numpy())
-            std_hat = np.std(embedding.reshape(-1).detach().cpu().numpy())
-            # 从RoBERTa的中间层取出权重，然后计算样本均值和方差
-            # 所使用的正态分布为(0, 1/d)
-            mu = 0.0
-            std = std_hat / (np.sqrt(intrinsic_dim) * args.sigma1) # 1/d
-            print('[Embedding] mu: {} | std: {} [RandProj]  mu: {} | std: {}'.format(mu_hat, std_hat, mu, std))
             for p in self.linear[0].parameters():
                 torch.nn.init.normal_(p, 0.0, std)
-            self.intermediate_stats = [(mu, std)]
-
+            
         if random_proj == 'trunc_normal':
-            # calculate std for normal distribution
-            print('Using Truncated Normal')
-            if model_name in ['roberta-base', 'roberta-large']:
-                embedding = self.model.roberta.get_input_embeddings().weight.clone().cpu()
-            elif model_name in ['bert-base-uncased', 'bert-large-uncased']:
-                embedding = self.model.bert.get_input_embeddings().weight.clone().cpu()
-            elif model_name in ['facebook/bart-base', 'facebook/bart-large', 'fnlp/cpt-large']:
-                embedding = self.model.model.get_input_embeddings().weight.clone().cpu()
-            elif model_name in ['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl']:
-                embedding = self.model.transformer.get_input_embeddings().weight.clone().cpu()
-            else:  # T5
-                embedding = self.model.get_input_embeddings().weight.clone().cpu()
-            # embedding = embedding[1000: 2000]
-            mu_hat = np.mean(embedding.reshape(-1).detach().cpu().numpy())
-            std_hat = np.std(embedding.reshape(-1).detach().cpu().numpy())
-            # 从RoBERTa的中间层取出权重，然后计算样本均值和方差
-            # 所使用的正态分布为(0, 1/d)
-            mu = 0.0
-            std = std_hat / (np.sqrt(intrinsic_dim) * args.sigma1) # 1/d
-            print('[Embedding] mu: {} | std: {} [RandProj]  mu: {} | std: {}'.format(mu_hat, std_hat, mu, std))
+            print('using Truncated Normal')
             for p in self.linear[0].parameters():
                 torch.nn.init.trunc_normal_(p, 0.0, std, a = -2.0, b = 2.0)
-            self.intermediate_stats = [(mu, std)]
 
-        if random_proj == 'xavier':
+        if random_proj == 'xavier_normal':
             print('Using Xavier Normal')
-            if model_name in ['roberta-base', 'roberta-large']:
-                embedding = self.model.roberta.get_input_embeddings().weight.clone().cpu()
-            elif model_name in ['bert-base-uncased', 'bert-large-uncased']:
-                embedding = self.model.bert.get_input_embeddings().weight.clone().cpu()
-            elif model_name in ['facebook/bart-base', 'facebook/bart-large', 'fnlp/cpt-large']:
-                embedding = self.model.model.get_input_embeddings().weight.clone().cpu()
-            elif model_name in ['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl']:
-                embedding = self.model.transformer.get_input_embeddings().weight.clone().cpu()
-            else:  # T5
-                embedding = self.model.get_input_embeddings().weight.clone().cpu()
-            mu_hat = np.mean(embedding.reshape(-1).detach().cpu().numpy())
-            std_hat = np.std(embedding.reshape(-1).detach().cpu().numpy())
-            mu = 0.0
-            std = std_hat / (np.sqrt(intrinsic_dim) * args.sigma1) # 1/d
-            # print('[Embedding] mu: {} | std: {} [RandProj]  mu: {} | std: {}'.format(mu_hat, std_hat, mu, std))
             for p in self.linear[0].parameters():
                 torch.nn.init.xavier_normal_(p)
-            self.intermediate_stats = [(mu, std)]
 
-
-        if random_proj == 'kaiming':
+        if random_proj == 'kaiming_normal':
             print('Using Kaiming Normal')
-            if model_name in ['roberta-base', 'roberta-large']:
-                embedding = self.model.roberta.get_input_embeddings().weight.clone().cpu()
-            elif model_name in ['bert-base-uncased', 'bert-large-uncased']:
-                embedding = self.model.bert.get_input_embeddings().weight.clone().cpu()
-            elif model_name in ['facebook/bart-base', 'facebook/bart-large', 'fnlp/cpt-large']:
-                embedding = self.model.model.get_input_embeddings().weight.clone().cpu()
-            elif model_name in ['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl']:
-                embedding = self.model.transformer.get_input_embeddings().weight.clone().cpu()
-            else:  # T5
-                embedding = self.model.get_input_embeddings().weight.clone().cpu()
-            mu_hat = np.mean(embedding.reshape(-1).detach().cpu().numpy())
-            std_hat = np.std(embedding.reshape(-1).detach().cpu().numpy())
-            mu = 0.0
-            std = std_hat / (np.sqrt(intrinsic_dim) * args.sigma1) # 1/d
-            # print('[Embedding] mu: {} | std: {} [RandProj]  mu: {} | std: {}'.format(mu_hat, std_hat, mu, std))
             for p in self.linear[0].parameters():
-                torch.nn.init.kaiming_uniform_(p, mode='fan_in', nonlinearity='relu')
-            self.intermediate_stats = [(mu, std)]
+                torch.nn.init.kaiming_normal_(p,a=0,mode='fan_in',nonlinearity='leaky_relu')
 
         self.best_train_perf = 0.0
         self.best_dev_perf = 0.0
         self.num_call = 0
-        # self.save_path = save_path
         self.print_every = print_every
         self.eval_every = eval_every
         self.loss_type = loss_type
-        # if save_path is not None:
-        #     os.makedirs(save_path, exist_ok=True)
-        if task_name == 'sst2':
+        if task_name == 'SST-2':
             self.metric = SST2Metric(target='labels', pred='logits', tokenizer=tokenizer)
             self.metric_key = 'acc'
             self.metric_name = 'SST2Metric'
-        elif task_name == 'agnews':
+        elif task_name == 'AGNews':
             self.metric = AGNewsMetric(target='labels', pred='logits', tokenizer=tokenizer)
             self.metric_key = 'acc'
             self.metric_name = 'AGNewsMetric'
-        elif task_name == 'yelpp':
+        elif task_name == 'Yelp':
             self.metric = YelpPMetric(target='labels', pred='logits', tokenizer=tokenizer)
             self.metric_key = 'acc'
             self.metric_name = 'YelpPMetric'
-        elif task_name == 'dbpedia':
-            self.metric = DBPediaMetric(target='labels', pred='logits', tokenizer=tokenizer)
-            self.metric_key = 'acc'
-            self.metric_name = 'DBPediaMetric'
-        elif task_name == 'rte':
-            self.metric = RTEMetric(target='labels', pred='logits', tokenizer=tokenizer)
-            self.metric_key = 'acc'
-            self.metric_name = 'RTEMetric'
-        elif task_name == 'mrpc':
+        elif task_name == 'MRPC':
             self.metric = MRPCMetric(target='labels', pred='logits', tokenizer=tokenizer)
-            self.metric_key = 'f1'
+            self.metric_key = 'acc'
             self.metric_name = 'MRPCMetric'
-        elif task_name == 'snli':
+        elif task_name == 'SNLI':
             self.metric = SNLIMetric(target='labels', pred='logits', tokenizer=tokenizer)
             self.metric_key = 'acc'
             self.metric_name = 'SNLIMetric'
-        elif task_name == 'chnsent':
-            self.metric = ChnSentMetric(target='labels', pred='logits', tokenizer=tokenizer)
+        elif task_name == 'TREC':
+            self.metric = TRECMetric(target='labels', pred='logits', tokenizer=tokenizer)
             self.metric_key = 'acc'
-            self.metric_name = 'ChnSentMetric'
-        elif task_name == 'thucnews':
-            self.metric = THUCNewsMetric(target='labels', pred='logits', tokenizer=tokenizer)
-            self.metric_key = 'acc'
-            self.metric_name = 'THUCNewsMetric'
-        elif task_name == 'lcqmc':
-            self.metric = LCQMCMetric(target='labels', pred='logits', tokenizer=tokenizer)
-            self.metric_key = 'acc'
-            self.metric_name = 'LCQMCMetric'
-        elif task_name == 'cmnli':
-            self.metric = CMNLIMetric(target='labels', pred='logits', tokenizer=tokenizer)
-            self.metric_key = 'acc'
-            self.metric_name = 'CMNLIMetric'
-        elif task_name == 'ocnli':
-            self.metric = OCNLIMetric(target='labels', pred='logits', tokenizer=tokenizer)
-            self.metric_key = 'acc'
-            self.metric_name = 'OCNLIMetric'
-        elif task_name == 'amazon':
-            self.metric = AmazonMetric(target='labels', pred='logits', tokenizer=tokenizer)
-            self.metric_key = 'acc'
-            self.metric_name = 'AmazonMetric'
-        elif task_name == 'bq':
-            self.metric = BQMetric(target='labels', pred='logits', tokenizer=tokenizer)
-            self.metric_key = 'acc'
-            self.metric_name = 'BQMetric'
-        elif task_name == 'ccpm':
-            self.metric = CCPMMetric(target='labels', pred='logits', tokenizer=tokenizer)
-            self.metric_key = 'acc'
-            self.metric_name = 'CCPMMetric'
-        elif task_name == 'tnews':
-            self.metric = TNewsMetric(target='labels', pred='logits', tokenizer=tokenizer)
-            self.metric_key = 'acc'
-            self.metric_name = 'TNewsMetric'
-        elif task_name == 'c3':
-            self.metric = C3Metric(target='labels', pred='logits', tokenizer=tokenizer)
-            self.metric_key = 'acc'
-            self.metric_name = 'C3Metric'
+            self.metric_name = 'TRECMetric'
         else:
             raise NotImplementedError
         self.margin = self.metric.margin
@@ -462,100 +321,96 @@ class LMForwardAPI:
 
         self.model.set_prompt_embedding(best_prefix)
 
-        if isinstance(test_data, DataSet):
-            self.model.set_prompt_embedding(self.best)
-            test_tester = Tester(data=test_data, model=self.model, metrics=self.metric, batch_size=batch_size,
-                                 num_workers=1, device=device, use_tqdm=True)
-            results = test_tester.test()
-            test_acc = results[self.metric_name][self.metric_key]
-            # fitlog.add_best_metric(test_acc, name='test_acc')
-            return test_acc
-        else:
-            for k, v in train_data.items():
-                train_data[k] = v.to(device)
-            with torch.no_grad():
-                if model_name in ['t5-small', 't5-base', 't5-large', 't5-3b']:
-                    outputs = self.model(
-                        input_ids=train_data['input_ids'],
-                        attention_mask=train_data['attention_mask'],
-                        decoder_input_ids=train_data['decoder_input_ids'],
-                        decoder_attention_mask=train_data['decoder_attention_mask'],
-                    )
-                elif model_name in ['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl']:
-                    outputs = self.model(
-                        input_ids=train_data['input_ids'],
-                        attention_mask=train_data['attention_mask'],
-                    )
+        for k, v in train_data.items():
+            train_data[k] = v.to(device)
+        with torch.no_grad():
+            if model_name in ['t5-small', 't5-base', 't5-large', 't5-3b']:
+                outputs = self.model(
+                    input_ids=train_data['input_ids'],
+                    attention_mask=train_data['attention_mask'],
+                    decoder_input_ids=train_data['decoder_input_ids'],
+                    decoder_attention_mask=train_data['decoder_attention_mask'],
+                )
+            elif model_name in ['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl']:
+                outputs = self.model(
+                    input_ids=train_data['input_ids'],
+                    attention_mask=train_data['attention_mask'],
+                )
+            else:
+                outputs = self.model(
+                    input_ids=train_data['input_ids'],
+                    attention_mask=train_data['attention_mask'],
+                    mask_pos=train_data['mask_pos'],
+                )
+            logits = outputs['logits']
+            if random_proj in ['normal', 'trunc_normal', 'xavier_normal', 'kaiming_normal'] and len(self.intermediate_stats) == 1:
+                # if is the first forward pass, record the range of hidden states of each layer
+                print('Calculating std for random projections...')
+                if self.model_name in ['facebook/bart-base', 'facebook/bart-large',
+                                        't5-small', 't5-base', 't5-large', 't5-3b',
+                                        'fnlp/cpt-large',
+                                        ]:
+                    hidden_states = outputs['encoder_hidden_states']
                 else:
-                    outputs = self.model(
-                        input_ids=train_data['input_ids'],
-                        attention_mask=train_data['attention_mask'],
-                        mask_pos=train_data['mask_pos'],
-                    )
-                logits = outputs['logits']
-                if random_proj == 'normal' and len(self.intermediate_stats) == 1:
-                    # if is the first forward pass, record the range of hidden states of each layer
-                    print('Calculating std for random projections...')
-                    if self.model_name in ['facebook/bart-base', 'facebook/bart-large',
-                                           't5-small', 't5-base', 't5-large', 't5-3b',
-                                           'fnlp/cpt-large',
-                                           ]:
-                        hidden_states = outputs['encoder_hidden_states']
-                    else:
-                        hidden_states = outputs['hidden_states']
-                    for i, h in enumerate(hidden_states[1:-1]):
-                        if save_hiddens:
-                            hid_path = './hidstates/{}'.format(self.model_name.split('/')[-1])
-                            if not os.path.exists(hid_path):
-                                os.makedirs(hid_path, exist_ok=True)
-                            with open('{}/hidden_{}.bin'.format(hid_path, i + 1), 'wb') as f:
-                                pickle.dump(h, f)
-                        print('[Layer {}]'.format(i + 1))
-                        hidden = h.clone().reshape(-1).detach().cpu().numpy()
+                    hidden_states = outputs['hidden_states']
+                for i, h in enumerate(hidden_states[1:-1]):
+                    if save_hiddens:
+                        hid_path = './hidstates/{}'.format(self.model_name.split('/')[-1])
+                        if not os.path.exists(hid_path):
+                            os.makedirs(hid_path, exist_ok=True)
+                        with open('{}/hidden_{}.bin'.format(hid_path, i + 1), 'wb') as f:
+                            pickle.dump(h, f)
+                    print('[Layer {}]'.format(i + 1))
+                    hidden = h.clone().reshape(-1).detach().cpu().numpy()
+                    mu_hat = np.mean(hidden)
+                    std_hat = np.std(hidden)
+                    max_h = np.max(hidden)
+                    min_h = np.min(hidden)
+                    print(' - Before clipping: mu=%.4f, std=%.4f, min=%.4f, max=%.4f' % (
+                        mu_hat, std_hat, min_h, max_h))
+                    # Clipping outliers
+                    clip_round = 0
+                    while clip_round < 5:
+                        clip_round += 1
+                        min_bound = mu_hat - 3 * std_hat
+                        max_bound = mu_hat + 3 * std_hat
+                        hidden = np.clip(hidden, min_bound, max_bound)
                         mu_hat = np.mean(hidden)
                         std_hat = np.std(hidden)
                         max_h = np.max(hidden)
                         min_h = np.min(hidden)
-                        print(' - Before clipping: mu=%.4f, std=%.4f, min=%.4f, max=%.4f' % (
-                            mu_hat, std_hat, min_h, max_h))
-                        # Clipping outliers
-                        clip_round = 0
-                        while clip_round < 5:
-                            clip_round += 1
-                            min_bound = mu_hat - 3 * std_hat
-                            max_bound = mu_hat + 3 * std_hat
-                            hidden = np.clip(hidden, min_bound, max_bound)
-                            mu_hat = np.mean(hidden)
-                            std_hat = np.std(hidden)
-                            max_h = np.max(hidden)
-                            min_h = np.min(hidden)
-                            print(' - After clipping (round %d): mu=%.4f, std=%.4f, min=%.4f, max=%.4f' % (
-                                clip_round, mu_hat, std_hat, min_h, max_h))
-                        # Calculating std dev for the random projection
-                        mu = 0.0
-                        std = std_hat / (np.sqrt(intrinsic_dim) * args.sigma1)
-                        # temp = intrinsic_dim - std_hat * std_hat
-                        # mu = mu_hat / temp
-                        # std = std_hat / np.sqrt(temp)
-                        print(' - Random Projection: mu=%.4f, std=%.4f' % (mu, std))
+                        print(' - After clipping (round %d): mu=%.4f, std=%.4f, min=%.4f, max=%.4f' % (
+                            clip_round, mu_hat, std_hat, min_h, max_h))
+                    # Calculating std dev for the random projection
+                    mu = 0.0
+                    std = std_hat / (np.sqrt(intrinsic_dim) * args.sigma1)
+                    print(' -Eval-Random Projection: mu=%.4f, std=%.4f' % (mu, std))
+                    if random_proj == 'normal':
+                        print('using Normal in Eval')
                         for p in self.linear[i + 1].parameters():
                             torch.nn.init.normal_(p, mu, std)
-                        self.intermediate_stats.append((mu, std))
-                    assert len(self.intermediate_stats) == self.config.num_hidden_layers
-                    self.model.config.output_hidden_states = None
-                    print('Random projections initialized.')
+                    if random_proj == 'trunc_normal':
+                        print('using Truncated Normal in Eval')
+                        for p in self.linear[i + 1].parameters():
+                            torch.nn.init.trunc_normal_(p, 0.0, std, a = -2.0, b = 2.0)
+                    if random_proj == 'kaiming_normal':
+                        print('using Kaiming Normal in Eval')
+                        for p in self.linear[i + 1].parameters():
+                            torch.nn.init.kaiming_normal_(p, a = 0, mode = 'fan_in', nonlinearity = 'leaky_relu')
+                    if random_proj == 'xavier_normal':
+                        print('using Xavier Normal in Eval')
+                        for p in self.linear[i + 1].parameters():
+                           torch.nn.init.xavier_normal_(p)
+
+                    self.intermediate_stats.append((mu, std))
+                assert len(self.intermediate_stats) == self.config.num_hidden_layers
+                self.model.config.output_hidden_states = None
+                print('Random projections initialized.')
 
             loss, perf = self.calc_metric(logits, train_data['labels'])
-            # fitlog.add_loss(loss, name=self.loss_type, step=self.num_call)
-            # fitlog.add_metric(perf, name='train_acc', step=self.num_call)
 
             if perf > self.best_train_perf:
                 self.best_train_perf = perf
-                # fitlog.add_best_metric(self.best_train_perf, name='train_acc')
-
-            # if self.save_path is not None:
-            #     with open(os.path.join(self.save_path, 'train_acc.txt'), 'a') as fout:
-            #         fout.write('{}\t{}\t{}\n'.format(self.num_call, loss, perf))
 
             if self.num_call % self.print_every == 0:
                 print(
@@ -590,14 +445,9 @@ class LMForwardAPI:
                         )['logits']
 
                 dev_loss, dev_perf = self.calc_metric(logits, dev_data['labels'])
-                # fitlog.add_metric(dev_perf, name='dev_acc', step=self.num_call)
                 if dev_perf > self.best_dev_perf:
                     self.best_dev_perf = dev_perf
-                    # fitlog.add_best_metric(self.best_dev_perf, name='dev_acc')
                     self.best = best_prefix.clone()
-                # if self.save_path is not None:
-                #     with open(os.path.join(self.save_path, 'dev_loss.txt'), 'a') as fout:
-                #         fout.write('{}\t{}\t{}\n'.format(self.num_call, dev_loss, dev_perf))
                 print('Dev loss: {}. Dev perf: {}. Best dev perf: {}'.format(
                     round(float(dev_loss), 4),
                     round(float(dev_perf), 4),
@@ -606,107 +456,140 @@ class LMForwardAPI:
             return loss
 
 
+    def calculate_CM(self, best_prompt_embedding=None):
+        # self.num_call += 1
+        best_prefix = self.best_prefix.clone()
+        for i in range(24):
+            best_prompt_embedding[i] = torch.tensor(best_prompt_embedding[i]).type(torch.float32)  # z
+            best_prompt_embedding[i] = self.linear[i](best_prompt_embedding[i]).reshape(-1, self.config.hidden_size)  # Az
+            best_prefix[i] = best_prompt_embedding[i]
+
+        self.model.set_prompt_embedding(best_prefix)
+
+        for k, v in train_data.items():
+            train_data[k] = v.to(device)
+        with torch.no_grad():
+            outputs = self.model(
+                input_ids=train_data['input_ids'],
+                attention_mask=train_data['attention_mask'],
+                mask_pos=train_data['mask_pos'],
+            )
+            logits = outputs['logits']
+            if random_proj in ['normal', 'trunc_normal'] and len(self.intermediate_stats) == 1:
+                # if is the first forward pass, record the range of hidden states of each layer
+                print('Calculating std for random projections...')
+                if self.model_name[18:] in ['facebook/bart-base', 'facebook/bart-large',
+                                        't5-small', 't5-base', 't5-large', 't5-3b',
+                                        'fnlp/cpt-large',
+                                        ]:
+                    hidden_states = outputs['encoder_hidden_states']
+                else:
+                    hidden_states = outputs['hidden_states']
+                for i, h in enumerate(hidden_states[1:-1]):
+                    if save_hiddens:
+                        hid_path = './hidstates/{}'.format(self.model_name.split('/')[-1])
+                        if not os.path.exists(hid_path):
+                            os.makedirs(hid_path, exist_ok=True)
+                        with open('{}/hidden_{}.bin'.format(hid_path, i + 1), 'wb') as f:
+                            pickle.dump(h, f)
+                    print('[Layer {}]'.format(i + 1))
+                    hidden = h.clone().reshape(-1).detach().cpu().numpy()
+                    mu_hat = np.mean(hidden)
+                    std_hat = np.std(hidden)
+                    max_h = np.max(hidden)
+                    min_h = np.min(hidden)
+                    print(' - Before clipping: mu=%.4f, std=%.4f, min=%.4f, max=%.4f' % (
+                        mu_hat, std_hat, min_h, max_h))
+                    # Clipping outliers
+                    clip_round = 0
+                    while clip_round < 5:
+                        clip_round += 1
+                        min_bound = mu_hat - 3 * std_hat
+                        max_bound = mu_hat + 3 * std_hat
+                        hidden = np.clip(hidden, min_bound, max_bound)
+                        mu_hat = np.mean(hidden)
+                        std_hat = np.std(hidden)
+                        max_h = np.max(hidden)
+                        min_h = np.min(hidden)
+                        print(' - After clipping (round %d): mu=%.4f, std=%.4f, min=%.4f, max=%.4f' % (
+                            clip_round, mu_hat, std_hat, min_h, max_h))
+                    # Calculating std dev for the random projection
+                    mu = 0.0
+                    std = std_hat / (np.sqrt(intrinsic_dim) * args.sigma1)
+                    # temp = intrinsic_dim - std_hat * std_hat
+                    # mu = mu_hat / temp
+                    # std = std_hat / np.sqrt(temp)
+                    print(' - calculate CM Random Projection: mu=%.4f, std=%.4f' % (mu, std))
+                    if random_proj == 'normal':
+                        print('using Normal in calc cm')
+                        for p in self.linear[i + 1].parameters():
+                            torch.nn.init.normal_(p, mu, std)
+                    if random_proj == 'trunc_normal':
+                        print('using Truncated Normal in calc cm')
+                        for p in self.linear[i + 1].parameters():
+                            torch.nn.init.trunc_normal_(p, 0.0, std, a = -2.0, b = 2.0)
+                    if random_proj == 'kaiming_normal':
+                        print('using Kaiming Normal in calc cm')
+                        for p in self.linear[i + 1].parameters():
+                            torch.nn.init.kaiming_normal_(p, a = 0, mode = 'fan_in', nonlinearity = 'leaky_relu')
+                    if random_proj == 'xavier_normal':
+                        print('using Xavier Normal in calc cm')
+                        for p in self.linear[i + 1].parameters():
+                           torch.nn.init.xavier_normal_(p)
+
+                    self.intermediate_stats.append((mu, std))
+                assert len(self.intermediate_stats) == self.config.num_hidden_layers
+                self.model.config.output_hidden_states = None
+                print('Random projections initialized.')
+
+        print('********* Evaluated on dev set *********')
+        for k, v in dev_data.items():
+            dev_data[k] = v.to(device)
+        with torch.no_grad():
+            logits = self.model(
+                input_ids=dev_data['input_ids'],
+                attention_mask=dev_data['attention_mask'],
+                mask_pos=dev_data['mask_pos'],
+            )['logits']
+
+        dev_loss, dev_perf = self.calc_metric(logits, dev_data['labels'])
+
+
 if model_name in ['roberta-base', 'roberta-large']:
-    tokenizer = RobertaTokenizer.from_pretrained(model_name)
+    tokenizer = RobertaTokenizer.from_pretrained(model_path)
 elif model_name in ['bert-base-uncased', 'bert-large-uncased', 'fnlp/cpt-large']:
-    tokenizer = BertTokenizer.from_pretrained(model_name)
+    tokenizer = BertTokenizer.from_pretrained(model_path)
 elif model_name in ['facebook/bart-base', 'facebook/bart-large']:
-    tokenizer = BartTokenizer.from_pretrained(model_name)
+    tokenizer = BartTokenizer.from_pretrained(model_path)
 elif model_name in ['t5-small', 't5-base', 't5-large', 't5-3b']:
-    tokenizer = T5Tokenizer.from_pretrained(model_name)
+    tokenizer = T5Tokenizer.from_pretrained(model_path)
 elif model_name in ['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl']:
-    tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+    tokenizer = GPT2Tokenizer.from_pretrained(model_path)
 else:
     raise NotImplementedError
 
 cache_fn = f"caches/data_{model_name.replace('/', '-')}_{task_name}_{n_prompt_tokens}_{seed}.pt"
-if model_name not in ['fnlp/cpt-large']:
-    DataLoader = {
-        'sst2': SST2Loader,
-        'agnews': AGNewsLoader,
-        'yelpp': YelpPLoader,
-        'dbpedia': DBPediaLoader,
-        'rte': RTELoader,
-        'mrpc': MRPCLoader,
-        'snli': SNLILoader,
-    }
-else:
-    DataLoader = {
-        'chnsent': ChnSentLoader,
-        'thucnews': THUCNewsLoader,
-        'lcqmc': LCQMCLoader,
-        'cmnli': CMNLILoader,
-        'ocnli': OCNLILoader,
-        'amazon': AmazonLoader,
-        'bq': BQLoader,
-        'ccpm': CCPMLoader,
-        'tnews': TNewsLoader,
-        'c3': C3Loader,
-    }
+
+DataLoader = {
+    'SST-2': SST2Loader,
+    'AGNews': AGNewsLoader,
+    'Yelp': YelpPLoader,
+    'MRPC': MRPCLoader,
+    'SNLI': SNLILoader,
+    'TREC': TRECLoader,
+}
 
 
-@cache_results(cache_fn, _refresh=False)
+@cache_results(cache_fn, _refresh=True)
 def get_data(task_name, tokenizer):
-    if task_name in ['agnews', 'yelpp', 'dbpedia', 'snli']:
-        splits = ['train', 'test']
-    else:  # for datasets without test set, we use dev set
-        splits = ['train', 'validation']
-    if args.cat_or_add == 'cat':
-        data_bundle = DataLoader[task_name](tokenizer=tokenizer, n_prompt_tokens=0).my_load(splits)
-    else:
-        data_bundle = DataLoader[task_name](tokenizer=tokenizer, n_prompt_tokens=n_prompt_tokens).my_load(splits)
+    splits = ['train', 'dev']
+    data_bundle = DataLoader[task_name](tokenizer=tokenizer, n_prompt_tokens=n_prompt_tokens).my_load(splits, seed)
     return data_bundle
 
-
-def construct_true_few_shot_data(train_data, k_shot):
-    train_label_count = {}
-    dev_label_count = {}
-    new_train_data = DataSet()
-    new_dev_data = DataSet()
-    all_indices = [_ for _ in range(len(train_data))]
-    np.random.shuffle(all_indices)
-
-    for index in all_indices:
-        label = train_data[index]['labels']
-        if label < 0:
-            continue
-
-        if label not in train_label_count:
-            train_label_count[label] = 0
-        if label not in dev_label_count:
-            dev_label_count[label] = 0
-
-        if train_label_count[label] < k_shot:
-            new_train_data.append(train_data[index])
-            train_label_count[label] += 1
-        elif dev_label_count[label] < k_shot:
-            new_dev_data.append(train_data[index])
-            dev_label_count[label] += 1
-
-    if model_name in ['t5-small', 't5-base', 't5-large', 't5-3b']:
-        new_train_data.set_input("input_ids", "attention_mask", "decoder_input_ids", "decoder_attention_mask")
-        new_dev_data.set_input("input_ids", "attention_mask", "decoder_input_ids", "decoder_attention_mask")
-    elif model_name in ['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl']:
-        new_train_data.set_input("input_ids", "attention_mask")
-        new_dev_data.set_input("input_ids", "attention_mask")
-    else:
-        new_train_data.set_input("input_ids", "attention_mask", "mask_pos")
-        new_dev_data.set_input("input_ids", "attention_mask", "mask_pos")
-
-    new_train_data.set_target("labels")
-    new_dev_data.set_target("labels")
-    return new_train_data, new_dev_data
-
-
 data_bundle = get_data(task_name=task_name, tokenizer=tokenizer)
-if task_name in ['agnews', 'yelpp', 'dbpedia', 'snli']:
-    train_data, test_data = data_bundle.get_dataset('train'), data_bundle.get_dataset('test')
-else:
-    train_data, test_data = data_bundle.get_dataset('train'), data_bundle.get_dataset('validation')
+train_data, dev_data = data_bundle.get_dataset('train'), data_bundle.get_dataset('dev')
 
-train_data, dev_data = construct_true_few_shot_data(train_data, k_shot)
-
-for ds in [train_data, dev_data, test_data]:
+for ds in [train_data, dev_data]:
     ds.set_pad_val('input_ids', tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0)
     ds.set_pad_val('attention_mask', 0)
 
@@ -716,9 +599,6 @@ print(train_data[0])
 print('\n# of dev data: {}'.format(len(dev_data)))
 print('Example:')
 print(dev_data[0])
-print('\n# of test data: {}'.format(len(test_data)))
-print('Example:')
-print(test_data[0])
 
 if model_name in ['t5-small', 't5-base', 't5-large', 't5-3b']:
     train_data = {
@@ -762,9 +642,9 @@ else:
 
 model_forward_api = LMForwardAPI(
     model_name=model_name,
+    model_path=model_path,
     n_prompt_tokens=n_prompt_tokens,
     task_name=task_name,
-    # save_path=save_path,
     loss_type=loss_type,
 )
 
@@ -780,7 +660,6 @@ if bound > 0:
 sigmas = [sigma1]
 for i in range(model_forward_api.config.num_hidden_layers - 1):
     sigmas.append(sigma2)
-    # sigmas.append(sigma1 * math.pow(0.9, i + 1))
 assert len(sigmas) == model_forward_api.config.num_hidden_layers
 es_list = [
     cma.CMAEvolutionStrategy(intrinsic_dim * [0], sigmas[i], inopts=cma_opts)
@@ -799,7 +678,7 @@ for _ in range(budget // (int(popsize) * model_forward_api.config.num_hidden_lay
 
 end_time = time.time()
 print('Done. Elapsed time: {} (mins)'.format((end_time - start_time) / 60))
-print('Evaluate on test data...')
-test_acc = model_forward_api.eval(test_data=test_data)
-print('Test acc: {}'.format(round(test_acc, 4)))
-# fitlog.finish()
+if not os.path.exists(f'./results/{task_name}/{seed}'):
+    os.makedirs(f'./results/{task_name}/{seed}')
+
+torch.save(model_forward_api.best_prefix, f=f'./results/{task_name}/{seed}/best.pt')
