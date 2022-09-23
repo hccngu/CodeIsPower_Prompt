@@ -20,11 +20,11 @@
 | Original BBTv2           | 6000   | CE        | Test acc: 0.7514 |
 | Xavier Normal            | 6000   | CE        | Test acc: 0.7085 |
 | Kaiming Normal           | 6000   | CE        | Test acc: 0.7439 |
-| Truncated Normal (-2, 2) | 6000   | CE        |                  |
+| Truncated Normal (-2, 2) | 6000   | CE        | Test acc: 0.6994 |
 | Original BBTv2           | 6000   | Hinge     |                  |
 | Xavier Normal            | 6000   | Hinge     |                  |
 | Kaiming Normal           | 6000   | Hinge     |                  |
-| Truncated Normal (-2, 2) | 6000   | Hinge     |                  |
+| Truncated Normal (-2, 2) | 6000   | Hinge     | Test acc: 0.6786 |
 
 ## SST-2
 
