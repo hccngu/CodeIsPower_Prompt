@@ -6,7 +6,7 @@ from transformers import RobertaTokenizer
 
 
 # 从huggingface datasets脚本中读取数据
-def load_hf_dataset(task_name: str = 'SST-2', seed: int = 42, split: str = 'train') -> datasets.Dataset:
+def load_hf_dataset(data_dir: str = 'datasets', task_name: str = 'SST-2', seed: int = 42, split: str = 'train') -> datasets.Dataset:
     """
     Please choose from:
     :param task_name: 'AGNews', 'MRPC', 'SNLI', 'SST-2', 'TREC', 'Yelp'
@@ -14,7 +14,7 @@ def load_hf_dataset(task_name: str = 'SST-2', seed: int = 42, split: str = 'trai
     :param split: 'train', 'dev'
     """
     dataset = datasets.load_dataset(
-        path=f'./datasets/{task_name}/{task_name}.py',
+        path=f'./{data_dir}/{task_name}/{task_name}.py',
         split=f'{split}_{seed}'
     )
     return dataset
@@ -37,7 +37,7 @@ def convert_to_features(example_batch, tokenizer):
 
 
 class SST2Loader(Loader):
-    def __init__(self, tokenizer=None, n_prompt_tokens=50):
+    def __init__(self, tokenizer=None, n_prompt_tokens=50, data_dir='datasets'):
         super().__init__()
         if tokenizer is None:
             self.tokenizer = RobertaTokenizer.from_pretrained('transformer_model/roberta-large')
@@ -48,6 +48,7 @@ class SST2Loader(Loader):
             0: "bad",
             1: "great",
         }
+        self.data_dir = data_dir
 
     def convert_examples(self, example):
         if self.n_prompt_tokens > 0:  # use randomly selected words as initial prompt
@@ -63,7 +64,7 @@ class SST2Loader(Loader):
     def _load(self, split, seed) -> DataSet:
         # load dataset with Huggingface's Datasets
         # dataset = datasets.load_dataset('glue', 'sst2', split=split)
-        dataset = load_hf_dataset(task_name='SST-2', split=split, seed=seed)
+        dataset = load_hf_dataset(self.data_dir, task_name='SST-2', split=split, seed=seed)
         dataset = dataset.map(self.convert_examples, load_from_cache_file=False)
         print('Example in {} set:'.format(split))
         print(dataset[0])
@@ -90,7 +91,7 @@ class SST2Loader(Loader):
 
 
 class YelpPLoader(Loader):
-    def __init__(self, tokenizer=None, n_prompt_tokens=50):
+    def __init__(self, tokenizer=None, n_prompt_tokens=50, data_dir='datasets'):
         super().__init__()
         if tokenizer is None:
             self.tokenizer = RobertaTokenizer.from_pretrained('roberta-large')
@@ -101,6 +102,7 @@ class YelpPLoader(Loader):
             0: "bad",
             1: "great",
         }
+        self.data_dir = data_dir
 
     def convert_examples(self, example):
         if self.n_prompt_tokens > 0:  # use randomly selected words as initial prompt
@@ -116,7 +118,7 @@ class YelpPLoader(Loader):
     def _load(self, split, seed) -> DataSet:
         # load dataset with Huggingface's Datasets
         # dataset = datasets.load_dataset('yelp_polarity', 'plain_text', split=split)
-        dataset = load_hf_dataset(task_name='Yelp', split=split, seed=seed)
+        dataset = load_hf_dataset(self.data_dir, task_name='Yelp', split=split, seed=seed)
         dataset = dataset.map(self.convert_examples, load_from_cache_file=False)
         print(dataset[0])
         dataset = dataset.map(partial(convert_to_features, tokenizer=self.tokenizer), batched=True, load_from_cache_file=False)
@@ -142,7 +144,7 @@ class YelpPLoader(Loader):
 
 
 class AGNewsLoader(Loader):
-    def __init__(self, tokenizer=None, n_prompt_tokens=50):
+    def __init__(self, tokenizer=None, n_prompt_tokens=50, data_dir='datasets'):
         super().__init__()
         if tokenizer is None:
             self.tokenizer = RobertaTokenizer.from_pretrained('roberta-large')
@@ -155,6 +157,7 @@ class AGNewsLoader(Loader):
             2: "Business",
             3: "Tech"
         }
+        self.data_dir = data_dir
 
     def convert_examples(self, example):
         if self.n_prompt_tokens > 0:  # use randomly selected words as initial prompt
@@ -170,7 +173,7 @@ class AGNewsLoader(Loader):
     def _load(self, split, seed) -> DataSet:
         # load dataset with Huggingface's Datasets
         # dataset = datasets.load_dataset('ag_news', 'default', split=split)
-        dataset = load_hf_dataset(task_name='AGNews', split=split, seed=seed)
+        dataset = load_hf_dataset(self.data_dir, task_name='AGNews', split=split, seed=seed)
         dataset = dataset.map(self.convert_examples, load_from_cache_file=False)
         print(dataset[0])
         dataset = dataset.map(partial(convert_to_features, tokenizer=self.tokenizer), batched=True, load_from_cache_file=False)
@@ -259,7 +262,7 @@ class DBPediaLoader(Loader):
 
 
 class MRPCLoader(Loader):
-    def __init__(self, tokenizer=None, n_prompt_tokens=50):
+    def __init__(self, tokenizer=None, n_prompt_tokens=50, data_dir='datasets'):
         super().__init__()
         if tokenizer is None:
             self.tokenizer = RobertaTokenizer.from_pretrained('roberta-large')
@@ -270,6 +273,7 @@ class MRPCLoader(Loader):
             0: "No",
             1: "Yes",
         }
+        self.data_dir = data_dir
 
     def convert_examples(self, example):
         if self.n_prompt_tokens > 0:  # use randomly selected words as initial prompt
@@ -285,7 +289,7 @@ class MRPCLoader(Loader):
     def _load(self, split, seed) -> DataSet:
         # load dataset with Huggingface's Datasets
         # dataset = datasets.load_dataset('glue', 'mrpc', split=split)
-        dataset = load_hf_dataset(task_name='MRPC', split=split, seed=seed)
+        dataset = load_hf_dataset(self.data_dir, task_name='MRPC', split=split, seed=seed)
         dataset = dataset.map(self.convert_examples, load_from_cache_file=False)
         print(dataset[0])
         dataset = dataset.map(partial(convert_to_features, tokenizer=self.tokenizer), batched=True, load_from_cache_file=False)
@@ -363,7 +367,7 @@ class RTELoader(Loader):
 
 
 class SNLILoader(Loader):
-    def __init__(self, tokenizer=None, n_prompt_tokens=50):
+    def __init__(self, tokenizer=None, n_prompt_tokens=50, data_dir='datasets'):
         super().__init__()
         if tokenizer is None:
             self.tokenizer = RobertaTokenizer.from_pretrained('roberta-large')
@@ -375,6 +379,7 @@ class SNLILoader(Loader):
             1: "Maybe",
             2: "No",
         }
+        self.data_dir = data_dir
 
     def convert_examples(self, example):
         if self.n_prompt_tokens > 0:  # use randomly selected words as initial prompt
@@ -389,7 +394,7 @@ class SNLILoader(Loader):
 
     def _load(self, split, seed) -> DataSet:
         # load dataset with Huggingface's Datasets
-        dataset = load_hf_dataset(task_name='SNLI', split=split, seed=seed)
+        dataset = load_hf_dataset(self.data_dir, task_name='SNLI', split=split, seed=seed)
         # dataset = datasets.load_dataset('snli', split=split)
         dataset = dataset.filter(lambda example: example['labels'] in [0, 1, 2])
         dataset = dataset.map(self.convert_examples, load_from_cache_file=False)
@@ -417,7 +422,7 @@ class SNLILoader(Loader):
 
 
 class TRECLoader(Loader):
-    def __init__(self, tokenizer=None, n_prompt_tokens=50):
+    def __init__(self, tokenizer=None, n_prompt_tokens=50, data_dir='datasets'):
         super().__init__()
         if tokenizer is None:
             self.tokenizer = RobertaTokenizer.from_pretrained('roberta-large')
@@ -432,6 +437,7 @@ class TRECLoader(Loader):
             4: "Numeric",
             5: "Location"
         }
+        self.data_dir = data_dir
 
     def convert_examples(self, example):
         if self.n_prompt_tokens > 0:  # use randomly selected words as initial prompt
@@ -453,7 +459,7 @@ class TRECLoader(Loader):
 
     def _load(self, split, seed) -> DataSet:
         # load dataset with Huggingface's Datasets
-        dataset = load_hf_dataset(task_name='TREC', split=split, seed=seed)
+        dataset = load_hf_dataset(self.data_dir, task_name='TREC', split=split, seed=seed)
         dataset = dataset.filter(lambda example: example['labels'] in [0, 1, 2, 3, 4, 5])
         dataset = dataset.map(self.convert_examples, load_from_cache_file=False)
         print(dataset[0])

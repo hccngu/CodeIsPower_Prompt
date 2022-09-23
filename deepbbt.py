@@ -71,6 +71,11 @@ parser.add_argument(
     type=str,
     help='Path to your onnx model.'
 )
+
+# for Data Augmentation
+parser.add_argument("--data_dir", default='datasets', type=str, help="'dataset' represents origin datasets, for DA, please select 'DA_datasets'. ")
+
+
 args = parser.parse_args()
 
 # below are free hyper-params
@@ -111,6 +116,7 @@ eval_every = args.eval_every
 inference_framework = args.inference_framework
 onnx_model_path = args.onnx_model_path
 save_hiddens = True
+data_dir = args.data_dir
 
 # # fixed hyper-params
 # if cat_or_add == 'add':
@@ -519,7 +525,7 @@ elif model_name in ['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl']:
 else:
     raise NotImplementedError
 
-cache_fn = f"caches/data_{model_name.replace('/', '-')}_{task_name}_{n_prompt_tokens}_{seed}.pt"
+cache_fn = f"caches/data_{model_name.replace('/', '-')}_{data_dir}_{task_name}_{n_prompt_tokens}_{seed}.pt"
 
 DataLoader = {
     'SST-2': SST2Loader,
@@ -534,7 +540,7 @@ DataLoader = {
 @cache_results(cache_fn, _refresh=True)
 def get_data(task_name, tokenizer):
     splits = ['train', 'dev']
-    data_bundle = DataLoader[task_name](tokenizer=tokenizer, n_prompt_tokens=n_prompt_tokens).my_load(splits, seed)
+    data_bundle = DataLoader[task_name](tokenizer=tokenizer, n_prompt_tokens=n_prompt_tokens, data_dir=data_dir).my_load(splits, seed)
     return data_bundle
 
 data_bundle = get_data(task_name=task_name, tokenizer=tokenizer)
