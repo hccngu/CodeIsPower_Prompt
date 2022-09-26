@@ -54,6 +54,7 @@ def main(config: "DictConfig"):
     config.eval_batch_size = len(val_dataset)
     config.save_dir = os.path.join(output_dir, config.save_dir)
     trainer = make_trainer(algo_module, train_dataset, val_dataset, config)
+    print('Start train!')
     trainer.train(config=config)
 
 

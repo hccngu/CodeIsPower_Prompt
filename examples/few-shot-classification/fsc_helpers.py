@@ -13,18 +13,25 @@ class PromptedClassificationDataset(Dataset):
     def __init__(
         self, 
         source_texts: List[str], 
-        class_labels: List[str]
+        class_labels: List[str],
+        source_texts_2: List[str]
     ):
         assert len(source_texts) == len(class_labels)
         self.source_texts = source_texts
         self.class_labels = class_labels
+        self.source_texts_2 = source_texts_2
 
     def __len__(self):
         return len(self.source_texts)
 
     def __getitem__(self, idx):
-        item = {'source_texts': self.source_texts[idx],
-                'class_labels': self.class_labels[idx]}
+        if self.source_texts_2 is not None:
+            item = {'source_texts': self.source_texts[idx],
+                    'source_texts_2': self.source_texts_2[idx],
+                    'class_labels': self.class_labels[idx]}
+        else:
+            item = {'source_texts': self.source_texts[idx],
+                    'class_labels': self.class_labels[idx]}
         return item
 
 
@@ -49,13 +56,14 @@ def make_contest_dataset(
         config: "DictConfig") -> Tuple[PromptedClassificationDataset]:
     data_dict = {}
     for split in ['train', 'dev']:
-        source_texts, class_labels, num_classes, verbalizers, template = \
+        source_texts, class_labels, num_classes, verbalizers, template, source_texts_2 = \
             load_contest_dataset(config.dataset,
                                                  config.dataset_seed,
                                                  split, config.base_path,
                                                  config.num_shots)
         fsc_dataset = PromptedClassificationDataset(source_texts,
-                                                    class_labels)
+                                                    class_labels,
+                                                    source_texts_2)
         data_dict[split] = fsc_dataset
 
     return (data_dict['train'], data_dict['dev'], num_classes, verbalizers, template)
@@ -104,7 +112,7 @@ def load_contest_dataset(
     split: str,
     base_path: str,
     num_shots: int
-) -> Tuple[List[str]]:
+) -> tuple:
     assert dataset in ['AGNews', 'MRPC', 'SNLI', 'SST-2',
                        'TREC', 'Yelp']
     ####################改
@@ -116,13 +124,19 @@ def load_contest_dataset(
     filepath = f'contest/{dataset}/{seed_path}/{split}.tsv'
     full_filepath = os.path.join(base_path, filepath)
     df = pd.read_csv(full_filepath, sep='\t')
-    source_texts = df.iloc[:, 0].tolist()
-    class_labels = df.iloc[:, 1].tolist()
+    source_texts, class_labels, source_texts_2 = None, None, None
+    if dataset in ['SNLI', 'MRPC']:
+        source_texts = df.iloc[:, 0].tolist()
+        source_texts_2 = df.iloc[:, 1].tolist()
+        class_labels = df.iloc[:, 2].tolist()
+    else:
+        source_texts = df.iloc[:, 0].tolist()
+        class_labels = df.iloc[:, 1].tolist()
 
-    verbalizers = get_contest_verbalizers(dataset)
+    verbalizers, verb_label_dicts = get_contest_verbalizers(dataset)
     num_classes = len(verbalizers)
 
-    class_labels = encode_contest_label(class_labels, verbalizers)
+    class_labels = encode_contest_label(class_labels, verbalizers, verb_label_dicts)
 
     template = None
     if dataset in ['AGNews', 'TREC']:
@@ -133,13 +147,13 @@ def load_contest_dataset(
         template = "{sentence_1} {prompt} <mask> {sentence_2}"
 
     return (source_texts, class_labels,
-            num_classes, verbalizers, template)
+            num_classes, verbalizers, template, source_texts_2)
 
 
-def encode_contest_label(labels: list, verbalizers: list):
+def encode_contest_label(labels: list, verbalizers: list, verb_label_dict: dict):
     encoded_labels = []
     for label in labels:
-        encode_num = verbalizers.index(label)
+        encode_num = verbalizers.index(verb_label_dict[label])
         encoded_labels.append(encode_num)
     return encoded_labels
 
@@ -155,18 +169,24 @@ def get_dataset_verbalizers(dataset: str) -> List[str]:
     return verbalizers
 
 
-def get_contest_verbalizers(dataset: str) -> List[str]:
+def get_contest_verbalizers(dataset: str):
+    verbalizers, verb_label_dict = None, None
     if dataset in ['SST-2', 'Yelp']:
-        verbalizers = ['negative', 'positive']
+        verbalizers = ['bad', 'great']
+        verb_label_dict = {'negative': 'bad', 'positive': 'great'}
     elif dataset == 'AGNews':
-        verbalizers = ['world', 'sports', 'business', 'technology']
+        verbalizers = ['World', 'Sports', 'Business', 'Technology']
+        verb_label_dict = {'world': 'World', 'sports': 'Sports', 'business': 'Business', 'technology': 'Technology'}
     elif dataset == 'MRPC':
-        verbalizers = ['Equivalent', 'NotEquivalent']
+        verbalizers = ['Yes', 'No']
+        verb_label_dict = {'Equivalent': 'Yes', 'NotEquivalent': 'No'}
     elif dataset == 'SNLI':
-        verbalizers = ['Contradiction', 'Neutral', 'Entailment']
+        verbalizers = ['No', 'Maybe', 'Yes']
+        verb_label_dict = {'Contradiction': 'No', 'Neutral': 'Maybe', 'Entailment': 'Yes'}
     elif dataset == 'TREC':
-        verbalizers = ['human', 'description', 'numeric', 'entity', 'location', 'abbreviation']
-    return verbalizers
+        verbalizers = ['Human', 'Description', 'Numeric', 'Entity', 'Location', 'Abbreviation']
+        verb_label_dict = {'human': 'Human', 'description': 'Description', 'numeric': 'Numeric', 'entity': 'Entity', 'location': 'Location', 'abbreviation': 'Abbreviation'}
+    return verbalizers, verb_label_dict
 
 
 @dataclass
