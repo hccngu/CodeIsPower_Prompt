@@ -15,7 +15,7 @@ from models.modeling_roberta import RobertaModel
 import numpy as np
 import csv
 
-model_name = 'transformer_model/roberta-large'
+model_name = 'roberta-large'
 tokenizer = RobertaTokenizer.from_pretrained(model_name)
 
 
@@ -60,11 +60,11 @@ device = 'cuda:0'
 
 
 for task_name in ['TREC']:  # 'SNLI', 'SST-2', 'MRPC', 'AGNews', 'TREC', 
-    for seed in [42]:  # 8, 13, 42, 50, 
+    for seed in [8, 13, 42, 50, 60]:  # 
         torch.manual_seed(seed)
         np.random.seed(seed)
-        CM = torch.load(f'./bbtv2_results/{task_name}/{seed}/CM.pt').to(device)
-        best_prompt = torch.load(f'./bbtv2_results/{task_name}/{seed}/best.pt').to(device).view(24 , 50, -1)
+        # CM = torch.load(f'./bbtv2_results/{task_name}/{seed}/CM.pt').to(device)
+        best_prompt = torch.load(f'./results/{task_name}/{seed}/best.pt').to(device).view(24 , 50, -1)
 
         sentence_fn = sentence_fn_factory(task_name)
         # def embedding_and_attention_mask_fn(embedding, attention_mask):
@@ -86,18 +86,17 @@ for task_name in ['TREC']:  # 'SNLI', 'SST-2', 'MRPC', 'AGNews', 'TREC',
             test_data_path=f'./test_datasets/{task_name}/encrypted.pth',
             task_name=task_name,
             device=device,
-            tokenizer_path=model_name, 
-            model_path=model_name,
         ):
 
             verbalizers = verbalizer_dict[task_name]
             intrested_logits = [res[:, tokenizer.encode(verbalizer, add_special_tokens=False)[0]] for verbalizer in verbalizers]
-            intrested_logits = torch.softmax(torch.stack(intrested_logits).T, dim=1)
-            intrested_logits = torch.mul(intrested_logits, CM)
+            pred = torch.stack(intrested_logits).argmax(dim=0)
+            # intrested_logits = torch.softmax(torch.stack(intrested_logits).T, dim=1)
+            # intrested_logits = torch.mul(intrested_logits, CM)
             # if args.use_CM:
             # for i in range(len(intrested_logits)):
             #     intrested_logits[i] *= CM[0][i]
-            pred = intrested_logits.argmax(dim=1)
+            # pred = intrested_logits.argmax(dim=1)
             predictions = torch.cat([predictions, pred])
 
         if not os.path.exists(f'./predictions/{task_name}'):
