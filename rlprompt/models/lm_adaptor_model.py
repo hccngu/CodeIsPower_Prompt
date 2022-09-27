@@ -135,7 +135,7 @@ class LMAdaptorModel(BaseModel):
             # print(logits[:, 4:].min().item(), logits.max().item())
 
             if top_k is not None:
-                sampling_logits = _top_k_logits(logits, k=top_k)
+                sampling_logits = _top_k_logits(logits, k=top_k)  # 除了q
             elif top_p is not None:
                 sampling_logits = _top_p_logits(logits, p=top_p)
             else:
@@ -228,7 +228,7 @@ class LMAdaptorModel(BaseModel):
         input_lengths = token_encoding['attention_mask'].sum(dim=1)
         outputs = self.generator.model.transformer(input_ids,
                                                    past_key_values=past_key_values,
-                                                   use_cache=True)
+                                                   use_cache=True)  # Policy LM - distillGPT2
         last_token_hidden_state = \
             outputs.last_hidden_state[np.arange(input_ids.shape[0]),
                                       (input_lengths - 1)]
@@ -253,7 +253,7 @@ class LMAdaptorModel(BaseModel):
             eos_token_id = self.eos_token_id
 
         is_greedy_gen_mode = (do_sample == False) and (num_beams == 1)
-        is_sample_gen_mode = (do_sample == True) and (num_beams == 1)
+        is_sample_gen_mode = (do_sample == True) and (num_beams == 1)  # 默认为sample_gen_mode
         assert is_greedy_gen_mode or is_sample_gen_mode
 
         if is_greedy_gen_mode:

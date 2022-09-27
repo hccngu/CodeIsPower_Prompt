@@ -53,7 +53,7 @@ def make_few_shot_classification_dataset(
 
 
 def make_contest_dataset(
-        config: "DictConfig") -> Tuple[PromptedClassificationDataset]:
+        config: "DictConfig") -> tuple:
     data_dict = {}
     for split in ['train', 'dev']:
         source_texts, class_labels, num_classes, verbalizers, template, source_texts_2 = \
