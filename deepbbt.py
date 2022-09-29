@@ -1,4 +1,3 @@
-from errno import ESOCKTNOSUPPORT
 import os
 import copy
 import time

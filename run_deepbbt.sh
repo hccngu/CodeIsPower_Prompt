@@ -19,7 +19,7 @@ sigma2=0.2
 popsize=20
 bound=0
 budget=8000
-budget2=8000
+budget2=6000
 print_every=50
 eval_every=100
 
