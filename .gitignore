@@ -6,5 +6,5 @@
 *.bin
 *.pickle
 result*
-.history
 *.dat
+.history
