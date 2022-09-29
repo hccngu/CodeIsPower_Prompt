@@ -271,16 +271,17 @@ class LMForwardAPI:
             self.metric_name = 'MRPCMetric'
         elif task_name == 'SNLI':
             self.metric = SNLIMetric(target='labels', pred='logits', tokenizer=tokenizer)
-            self.metric_key = 'acc'
+            self.metric_key = 'f1' #acc
             self.metric_name = 'SNLIMetric'
         elif task_name == 'TREC':
             self.metric = TRECMetric(target='labels', pred='logits', tokenizer=tokenizer)
-            self.metric_key = 'acc'
+            self.metric_key = 'f1' #acc
             self.metric_name = 'TRECMetric'
         else:
             raise NotImplementedError
         self.margin = self.metric.margin
         self.ce_loss = torch.nn.CrossEntropyLoss(reduction='mean')
+        self.bce_loss = torch.nn.BCELoss(reduction='mean')
 
     def calc_metric(self, logits, target):
         label_map = self.metric.label_map
@@ -296,14 +297,18 @@ class LMForwardAPI:
             perf = (pred == converted_target).sum() / len(target)
         elif self.metric_key == 'f1':
             perf = f1_score(converted_target.detach().cpu().numpy().tolist(),
-                            pred.detach().cpu().numpy().tolist())
+                            pred.detach().cpu().numpy().tolist(), average = 'macro')
         else:
             raise KeyError(f'[Metric] Only support [acc, f1], got {self.metric_key} instead.')
 
         if self.loss_type == 'hinge':
             loss = hinge_loss(logits, converted_target, margin=self.margin, reduction='sum').item() / len(target)
+        elif self.loss_type == 'squared_hinge':
+            loss = hinge_loss(logits, converted_target, margin=self.margin, reduction='sum').item() ** 2 / len(target)
         elif self.loss_type == 'ce':
             loss = self.ce_loss(logits, converted_target).item()
+        elif self.loss_type == 'bce':
+            loss = self.bce_loss(logits, converted_target).item()
         elif self.loss_type == 'perf':
             loss = -1 * perf
         else:
