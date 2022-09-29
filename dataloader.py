@@ -379,15 +379,15 @@ class SNLILoader(Loader):
             if change_or_not==0:
                 return verb_
             if verb_ == 'No':
-                return 'Except'#'Unless'
+                return 'Unless'#'Except'
             elif verb_ == 'Maybe':
-                return 'Watch'#'Fortunately'
+                return 'Fortunately'#'Watch'
             elif verb_ == 'Yes':
-                return 'Alright'#'Regardless'
+                return 'Regardless'#'Alright'
         self.label2text = {
-            0: change_SNLI_verb("Yes",0),
-            1: change_SNLI_verb("Maybe",0),
-            2: change_SNLI_verb("No",0),
+            0: change_SNLI_verb("Yes",1),
+            1: change_SNLI_verb("Maybe",1),
+            2: change_SNLI_verb("No",1),
         }
         self.data_dir = data_dir
 
