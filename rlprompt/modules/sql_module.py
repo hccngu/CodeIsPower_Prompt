@@ -94,6 +94,7 @@ class SQLModule(BaseModule):
 
     def forward(self, batch: Dict[str, Any]) -> Tuple[Union[torch.Tensor, Dict],
                                                       Dict[str, Any]]:
+        # batch内容为一个dict，里面是输入文字和label
         loss_list = []
         loss_log_list = []
         for mode in self._forward_modes:
@@ -120,7 +121,7 @@ class SQLModule(BaseModule):
         if mode == ForwardMode.SQL_ON:
             print("##############mode == ForwardMode.SQL_ON##################")
             (logits, logits_, output_tokens, output_ids, sequence_lengths) = \
-                self._decode_sampling(batch=batch)
+                self._decode_sampling(batch=batch)  # 输入文字在这里没有作用
 
         raw_rewards, rewards_log = \
             self.compute_rewards(batch=batch, 
@@ -184,17 +185,13 @@ class SQLModule(BaseModule):
         batch: Dict[str, Any],
     ) -> Tuple[torch.Tensor, torch.Tensor, List[List[str]],
                torch.LongTensor, torch.LongTensor]:
-        outputs = self._model.generate(**batch,
-                                       do_sample=True,
-                                       top_k=self._top_k,
-                                       top_p=self._top_p,
-                                       num_beams=self._num_beams)
+        outputs = self._model.generate(**batch, do_sample=True, top_k=self._top_k, top_p=self._top_p, num_beams=self._num_beams)  # 用Policy LM采样一组prompt token
         print("##############outputs##################")
-        print(outputs)
+        # print(outputs)
         batch_ = {k: v for k, v in batch.items()}
-        batch_.update(outputs)
+        batch_.update(outputs)  # prompt token和input塞在一个dict里
 
-        outputs_ = self._target_model.teacher_forcing(**batch_)
+        outputs_ = self._target_model.teacher_forcing(**batch_)  # self._target_model为SinglePromptModel
         print("################generate outputs##############################")
         print(outputs['sample_logits'].contiguous(),
                 outputs_['sample_logits'].contiguous(),

@@ -101,7 +101,7 @@ class Trainer:
         step: int,
         batch: Dict[str, Any]
     ) -> Dict[str, Any]:
-        model = self.module.train()
+        model = self.module.train()  # SQLModule
         model._pre_steps(step)
 
         loss, batch_log = model(batch)

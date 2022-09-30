@@ -33,13 +33,14 @@ class SinglePromptModel(BaseModel):
         num_beams: Optional[int],
         max_new_tokens: Optional[int] = None,
         infer: bool = False,
+        source_texts_2: List[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         if infer: 
             batch_size = self.prompt_infer_batch_size
         else: 
             batch_size = self.prompt_train_batch_size
-        prompt_source = self._get_prompt_source(batch_size=batch_size)
+        prompt_source = self._get_prompt_source(batch_size=batch_size)  # batch_size长度的"<|endoftext|>"
 
         if max_new_tokens is None: 
             max_new_tokens = self.prompt_length
@@ -49,12 +50,13 @@ class SinglePromptModel(BaseModel):
                                     top_p=top_p,
                                     num_beams=num_beams,
                                     max_new_tokens=max_new_tokens,
-                                    **kwargs)
+                                    **kwargs)  # self._model为LMAdaptorModel
         ##########################
     def teacher_forcing(
         self,
         source_texts: List[str],
         sample_ids: torch.LongTensor,
+        source_texts_2: List[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         prompt_source = self._get_prompt_source(self.prompt_train_batch_size)

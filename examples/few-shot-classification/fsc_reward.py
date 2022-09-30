@@ -77,7 +77,8 @@ class PromptedClassificationReward(BaseReward):
         class_labels: List[int],
         output_tokens: List[List[str]],
         to_tensor: bool,
-        mode: str
+        mode: str,
+        source_texts_2: List[str] = None
     ) -> Tuple[Union[List[float], torch.Tensor], Dict[str, Any]]:
         assert mode in ["train", "infer"]
         
@@ -102,7 +103,7 @@ class PromptedClassificationReward(BaseReward):
             # Compute LM logits
             current_prompts = [prompt for _ in source_texts]
             formatted_templates = self._format_prompts(source_texts,
-                                                       current_prompts)
+                                                       current_prompts, source_texts_2)
             all_logits = self._get_logits(formatted_templates)
             # [batch_size, vocab_size]
             class_probs = torch.softmax(all_logits[:, self.verbalizer_ids], -1)
@@ -230,6 +231,11 @@ class PromptedClassificationReward(BaseReward):
         self,
         source_strs: List[str],
         prompt_strs: List[str],
+        source_strs_2: List[str]
     ) -> List[str]:
-        return [self.template.format(sentence_1=s_1, prompt=p)
-                for s_1, p in zip(source_strs, prompt_strs)]
+        if source_strs_2 == None:
+            return [self.template.format(sentence_1=s_1, prompt=p)
+                    for s_1, p in zip(source_strs, prompt_strs)]
+        else:
+            return [self.template.format(sentence_1=s_1, prompt=p, sentence_2=s_2)
+                    for s_1, p, s_2 in zip(source_strs, prompt_strs, source_strs_2)]
