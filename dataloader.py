@@ -466,7 +466,7 @@ class TRECLoader(Loader):
 
     def _load(self, split, seed) -> DataSet:
         # load dataset with Huggingface's Datasets
-        dataset = load_hf_dataset(task_name='TREC', split=split, seed=seed)
+        dataset = load_hf_dataset(data_dir=self.args.data_dir, task_name='TREC', split=split, seed=seed)
         dataset = dataset.filter(lambda example: example['labels'] in [0, 1, 2, 3, 4, 5])
         dataset = dataset.map(self.convert_examples, load_from_cache_file=False)
         print(dataset[0])

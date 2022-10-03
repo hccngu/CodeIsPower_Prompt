@@ -8,9 +8,10 @@ from utils import hinge_loss
 
 
 class SST2Metric(MetricBase):
-    def __init__(self, pred=None, target=None, seq_len=None, tokenizer=None):
+    def __init__(self, args=None, pred=None, target=None, seq_len=None, tokenizer=None):
         super().__init__()
         self._init_param_map(pred=pred, target=target, seq_len=seq_len)
+        self.args = args
         self._pred = []
         self._target = []
         self.hinge = 0.0
@@ -65,9 +66,10 @@ class SST2Metric(MetricBase):
 
 
 class YelpPMetric(MetricBase):
-    def __init__(self, pred=None, target=None, seq_len=None, tokenizer=None):
+    def __init__(self, args=None, pred=None, target=None, seq_len=None, tokenizer=None):
         super().__init__()
         self._init_param_map(pred=pred, target=target, seq_len=seq_len)
+        self.args = args
         self._pred = []
         self._target = []
         self.hinge = 0.0
@@ -121,9 +123,10 @@ class YelpPMetric(MetricBase):
 
 
 class AGNewsMetric(MetricBase):
-    def __init__(self, pred=None, target=None, seq_len=None, tokenizer=None):
+    def __init__(self, args=None, pred=None, target=None, seq_len=None, tokenizer=None):
         super().__init__()
         self._init_param_map(pred=pred, target=target, seq_len=seq_len)
+        self.args = args
         self._pred = []
         self._target = []
         self.hinge = 0.0
@@ -247,9 +250,10 @@ class DBPediaMetric(MetricBase):
 
 
 class MRPCMetric(MetricBase):
-    def __init__(self, pred=None, target=None, seq_len=None, tokenizer=None):
+    def __init__(self, args=None, pred=None, target=None, seq_len=None, tokenizer=None):
         super().__init__()
         self._init_param_map(pred=pred, target=target, seq_len=seq_len)
+        self.args = args
         self._pred = []
         self._target = []
         self.hinge = 0.0
@@ -303,9 +307,10 @@ class MRPCMetric(MetricBase):
 
 
 class SNLIMetric(MetricBase):
-    def __init__(self, pred=None, target=None, seq_len=None, tokenizer=None):
+    def __init__(self, args=None, pred=None, target=None, seq_len=None, tokenizer=None):
         super().__init__()
         self._init_param_map(pred=pred, target=target, seq_len=seq_len)
+        self.args = args
         self._pred = []
         self._target = []
         self.hinge = 0.0
@@ -327,6 +332,7 @@ class SNLIMetric(MetricBase):
         if not isinstance(target, torch.Tensor):
             raise TypeError(f"`target` in {_get_func_signature(self.evaluate)} must be torch.Tensor,"
                             f"got {type(target)}.")
+
         # pred: batch_size x seq_len x vocab_size
         self.ce_loss += self.ce_fct(pred, target).item()
 
@@ -359,9 +365,10 @@ class SNLIMetric(MetricBase):
 
 
 class TRECMetric(MetricBase):
-    def __init__(self, pred=None, target=None, seq_len=None, tokenizer=None):
+    def __init__(self, args=None, pred=None, target=None, seq_len=None, tokenizer=None):
         super().__init__()
         self._init_param_map(pred=pred, target=target, seq_len=seq_len)
+        self.args = args
         self._pred = []
         self._target = []
         self.hinge = 0.0
@@ -386,22 +393,109 @@ class TRECMetric(MetricBase):
         if not isinstance(target, torch.Tensor):
             raise TypeError(f"`target` in {_get_func_signature(self.evaluate)} must be torch.Tensor,"
                             f"got {type(target)}.")
-        # pred: batch_size x seq_len x vocab_size
-        self.ce_loss += self.ce_fct(pred, target).item()
+        if self.args.multiVerbalizer:
+            multi_interest_index = []
+            multi_interest_index.append(self.tokenizer.encode("Definition")[1])
+            multi_interest_index.append(self.tokenizer.encode("Description")[1])
+            multi_interest_index.append(self.tokenizer.encode("Manner")[1])
+            multi_interest_index.append(self.tokenizer.encode("Reason")[1])
+            multi_interest_index.append(self.tokenizer.encode("Animal")[1])
+            multi_interest_index.append(self.tokenizer.encode("Body")[1])
+            multi_interest_index.append(self.tokenizer.encode("Color")[1])
+            multi_interest_index.append(self.tokenizer.encode("Creative")[1])
+            multi_interest_index.append(self.tokenizer.encode("Currency")[1])
+            multi_interest_index.append(self.tokenizer.encode("Diseases")[1])
+            multi_interest_index.append(self.tokenizer.encode("Medicine")[1])
+            multi_interest_index.append(self.tokenizer.encode("Event")[1])
+            multi_interest_index.append(self.tokenizer.encode("Food")[1])
+            multi_interest_index.append(self.tokenizer.encode("Instrument")[1])
+            multi_interest_index.append(self.tokenizer.encode("Lang")[1])
+            multi_interest_index.append(self.tokenizer.encode("Letter")[1])
+            multi_interest_index.append(self.tokenizer.encode("Entity")[1])
+            multi_interest_index.append(self.tokenizer.encode("Plant")[1])
+            multi_interest_index.append(self.tokenizer.encode("Product")[1])
+            multi_interest_index.append(self.tokenizer.encode("Religion")[1])
+            multi_interest_index.append(self.tokenizer.encode("Sport")[1])
+            multi_interest_index.append(self.tokenizer.encode("Substance")[1])
+            multi_interest_index.append(self.tokenizer.encode("Symbol")[1])
+            multi_interest_index.append(self.tokenizer.encode("Technique")[1])
+            multi_interest_index.append(self.tokenizer.encode("Term")[1])
+            multi_interest_index.append(self.tokenizer.encode("Vehicle")[1])
+            multi_interest_index.append(self.tokenizer.encode("Word")[1])
+            multi_interest_index.append(self.tokenizer.encode("Abbreviation")[1])
+            multi_interest_index.append(self.tokenizer.encode("Expression")[1])
+            multi_interest_index.append(self.tokenizer.encode("Group")[1])
+            multi_interest_index.append(self.tokenizer.encode("Organization")[1])
+            multi_interest_index.append(self.tokenizer.encode("Individual")[1])
+            multi_interest_index.append(self.tokenizer.encode("Title")[1])
+            multi_interest_index.append(self.tokenizer.encode("Person")[1])
+            multi_interest_index.append(self.tokenizer.encode("Human")[1])
+            multi_interest_index.append(self.tokenizer.encode("Code")[1])
+            multi_interest_index.append(self.tokenizer.encode("Count")[1])
+            multi_interest_index.append(self.tokenizer.encode("Date")[1])
+            multi_interest_index.append(self.tokenizer.encode("Distance")[1])
+            multi_interest_index.append(self.tokenizer.encode("Money")[1])
+            multi_interest_index.append(self.tokenizer.encode("Order")[1])
+            multi_interest_index.append(self.tokenizer.encode("Number")[1])
+            multi_interest_index.append(self.tokenizer.encode("Period")[1])
+            multi_interest_index.append(self.tokenizer.encode("Percent")[1])
+            multi_interest_index.append(self.tokenizer.encode("Speed")[1])
+            multi_interest_index.append(self.tokenizer.encode("Temperature")[1])
+            multi_interest_index.append(self.tokenizer.encode("Size")[1])
+            multi_interest_index.append(self.tokenizer.encode("Weight")[1])
+            multi_interest_index.append(self.tokenizer.encode("Area")[1])
+            multi_interest_index.append(self.tokenizer.encode("Volume")[1])
+            multi_interest_index.append(self.tokenizer.encode("City")[1])
+            multi_interest_index.append(self.tokenizer.encode("Country")[1])
+            multi_interest_index.append(self.tokenizer.encode("Mountain")[1])
+            multi_interest_index.append(self.tokenizer.encode("Location")[1])
+            multi_interest_index.append(self.tokenizer.encode("State")[1])
 
-        # calculate hinge loss
-        hinge_target = target.clone()
-        for key, val in self.label_map.items():
-            hinge_target[target==key] = val
+            multi_logits = pred[:, multi_interest_index]
+            c0 = multi_logits[:, :4].mean(dim=1)
+            c1 = multi_logits[:, 4:27].mean(dim=1)
+            c2 = multi_logits[:, 27:29].mean(dim=1)
+            c3 = multi_logits[:, 29:35].mean(dim=1)
+            c4 = multi_logits[:, 35:50].mean(dim=1)
+            c5 = multi_logits[:, 50:].mean(dim=1)
+            logits = torch.stack([c0, c1, c2, c3, c4, c5]).T
 
-        for t in hinge_target.cpu().numpy().tolist():
-            self._target.append(t)
+            label_map = self.label_map
+            converted_target = target.clone()
+            for key, val in label_map.items():
+                converted_target[target == key] = val
+            # interest_index = list(label_map.keys())
+            # logits = logits[:, interest_index]
 
-        interest_index = list(self.label_map.keys())
-        pred = pred[:, interest_index]
-        self.hinge += hinge_loss(pred, hinge_target, self.margin, reduction='sum').item()
-        pred = pred.argmax(dim=-1).detach().cpu().numpy().tolist()
-        self._pred.extend(pred)
+            # calculate hinge loss
+            hinge_target = target.clone()
+            for key, val in self.label_map.items():
+                hinge_target[target==key] = val
+
+            for t in hinge_target.cpu().numpy().tolist():
+                self._target.append(t)
+                
+            pred = logits.argmax(dim=-1).detach().cpu().numpy().tolist()
+            self.hinge += hinge_loss(logits, converted_target, margin=self.margin, reduction='sum').item() / len(target)
+            self._pred.extend(pred)
+            self.ce_loss += self.ce_fct(pred, converted_target).item()
+        else:
+            # pred: batch_size x seq_len x vocab_size
+            self.ce_loss += self.ce_fct(pred, target).item()
+
+            # calculate hinge loss
+            hinge_target = target.clone()
+            for key, val in self.label_map.items():
+                hinge_target[target==key] = val
+
+            for t in hinge_target.cpu().numpy().tolist():
+                self._target.append(t)
+
+            interest_index = list(self.label_map.keys())
+            pred = pred[:, interest_index]
+            self.hinge += hinge_loss(pred, hinge_target, self.margin, reduction='sum').item()
+            pred = pred.argmax(dim=-1).detach().cpu().numpy().tolist()
+            self._pred.extend(pred)
 
 
     def get_metric(self, reset=True):
