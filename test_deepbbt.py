@@ -20,11 +20,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--task_name", default='SST-2', type=str, help='[SST-2, Yelp, AGNews, TREC, MRPC, SNLI]')
 parser.add_argument("--cuda", default=0, type=int)
 parser.add_argument("--seed", default=8, type=int)
+parser.add_argument("--print_every", default=50, type=int)
+parser.add_argument("--eval_every", default=100, type=int)
 # parser.add_argument("--suffix", default='', type=str)
 args = parser.parse_args()
 
 task_name = args.task_name
 seed = args.seed
+print_every = args.print_every
+eval_every = args.eval_every
 model_name = 'roberta-large'
 tokenizer = RobertaTokenizer.from_pretrained(model_name)
 
